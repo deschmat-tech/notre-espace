@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Marina et Mathieu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one phone-width column. Home lists our shared files; a file lists its houses; a house opens its own visit page. */
+:root{
+  --bg:#eef2f1; --surface:#ffffff; --ink:#14252b; --muted:#5a6a70; --line:#d5dedc;
+  --accent:#0d6b6e; --accent-soft:#dcedec; --heart:#c2415d;
+  --good:#2f7d4f; --good-soft:#dff0e5; --warn:#9a6205; --warn-soft:#f8ead0; --bad:#b3372f; --bad-soft:#f9e1de; --off:#7a858a; --off-soft:#e6eaea;
+  --display:"Bricolage Grotesque","Figtree",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#0f1a1d; --surface:#172529; --ink:#e8efee; --muted:#9bacb0; --line:#2a3d42;
+    --accent:#5cc2c0; --accent-soft:#15373a; --heart:#f0728c;
+    --good:#7fd19c; --good-soft:#173524; --warn:#e9b65c; --warn-soft:#3a2c10; --bad:#f08a80; --bad-soft:#40201c; --off:#93a0a4; --off-soft:#223135;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.45;-webkit-text-size-adjust:100%}
+main{max-width:640px;margin:0 auto;padding:16px 16px 72px;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h1{font-size:30px;line-height:1.1;font-weight:700}
+h2{font-size:20px;font-weight:700}
+h3{font-size:18px;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.sub{color:var(--muted)}
+.small{font-size:14px;color:var(--muted)}
+.back{font:inherit;font-weight:600;color:var(--accent);background:none;border:0;padding:6px 0;cursor:pointer;text-align:left}
+section{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+a.card,button.card{text-decoration:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.card.off{opacity:.55}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.prix{font-family:var(--display);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:600;white-space:nowrap}
+.s-a-caler{background:var(--warn-soft);color:var(--warn)}
+.s-visite-calee{background:var(--accent-soft);color:var(--accent)}
+.s-visitee,.s-offre,.ok{background:var(--good-soft);color:var(--good)}
+.s-ecartee,.gris{background:var(--off-soft);color:var(--off)}
+.moyen{background:var(--warn-soft);color:var(--warn)}
+.pb{background:var(--bad-soft);color:var(--bad)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--bg);border-radius:8px;padding:3px 8px;font-size:14px}
+.mot{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-weight:500}
+.lab{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+textarea,input[type=text],input[type=url],input[type=password],input[type=datetime-local],select{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+textarea{min-height:64px;resize:vertical}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{font:inherit;font-weight:600;background:var(--accent);color:var(--surface);border:0;border-radius:10px;padding:12px 16px;cursor:pointer}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.sel{background:var(--accent);color:var(--surface);border-color:var(--accent)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hearts{display:flex;gap:4px}
+.hearts button,.hearts span{font-size:28px;line-height:1;background:none;border:0;padding:2px 3px;color:var(--line)}
+.hearts button{cursor:pointer}
+.hearts .on{color:var(--heart)}
+.point{border-top:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:8px}
+.point:first-child{border-top:0;padding-top:0}
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tri button{font:inherit;font-size:15px;font-weight:600;padding:10px 4px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer}
+.tri button.on-b{background:var(--good-soft);color:var(--good);border-color:var(--good)}
+.tri button.on-m{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.tri button.on-p{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
+.row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row input[type=checkbox]{width:22px;height:22px;margin-top:1px;accent-color:var(--accent);flex:none}
+.fait{text-decoration:line-through;color:var(--muted)}
+.qui{margin-left:auto;flex:none;background:var(--bg);color:var(--muted)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 16px}
+.vide{color:var(--muted);font-style:italic}
+.txt{white-space:pre-wrap}
+ul.pbs{margin:0;padding-left:20px}
+.etat{font-size:13px;color:var(--muted);text-align:center;min-height:18px}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px}
+details summary{cursor:pointer;font-weight:600;color:var(--accent)}
+details[open] summary{margin-bottom:10px}
+.col{display:flex;flex-direction:column;gap:10px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<p class="etat" id="etat"></p>
+<script>
+const API = "https://bzdeoaiuswywwavudibl.supabase.co/rest/v1/rpc/";
+const KEY = "sb_publishable_QLOnwnv2zFY6t0FXwcMNDQ_fjDSJSUb";
+const STATUTS = {"a-caler":"Visite à caler","visite-calee":"Visite calée","visitee":"Visitée","offre":"Offre faite","ecartee":"Écartée"};
+const POINTS = [
+  ["toiture","Toiture"],["facades","Façades et murs extérieurs"],["jardin","Jardin et terrain"],
+  ["humidite","Humidité, odeurs"],["electricite","Électricité"],["chauffage","Chauffage"],["fenetres","Fenêtres"],
+  ["sejour","Pièce de vie"],["cuisine","Cuisine"],["sdb","Salle de bain et WC"],["chambres","Chambres"],
+  ["rangements","Garage, cave, rangements"],["quartier","Quartier, bruit, voisins"],["transports","Bus et trajets des garçons"]
+];
+const ETATS = {b:"Bien", m:"Moyen", p:"Problème"};
+const app = document.getElementById("app"), etat = document.getElementById("etat");
+const S = {maisons:{}, taches:{}, contacts:{}, meta:{}};
+let code = "", moi = "", loaded = false, dirty = false;
+const chains = {};
+
+function store(k, v){ try{ if(v === undefined) return localStorage.getItem(k) || ""; if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(e){} return ""; }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function euros(n){ return typeof n === "number" ? n.toLocaleString("fr-FR") + " €" : esc(n || ""); }
+function safeUrl(u){ return /^https?:\/\//i.test(u || "") ? u : ""; }
+function sorted(o){ return Object.entries(o).sort((a,b) => (a[1].ordre ?? 99) - (b[1].ordre ?? 99) || a[0].localeCompare(b[0])); }
+function quand(v){
+  if(!v) return "";
+  const d = new Date(v); if(isNaN(d)) return esc(v);
+  const s = d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  return s + (/T\d/.test(v) ? " à " + d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}).replace(":","h") : "");
+}
+function dire(t){ etat.textContent = t || ""; }
+
+async function rpc(fn, body){
+  const r = await fetch(API + fn, {method:"POST", headers:{apikey:KEY, Authorization:"Bearer " + KEY, "Content-Type":"application/json"}, body:JSON.stringify(body)});
+  if(!r.ok){
+    let m = ""; try{ m = (await r.json()).message || ""; }catch(e){}
+    const err = new Error(m || ("http " + r.status)); err.code = m; throw err;
+  }
+  return r.json();
+}
+async function charger(){
+  if(!code) return;
+  try{
+    const rows = await rpc("mm_list", {p_code: code});
+    const pending = Object.keys(chains).length > 0;
+    if(pending) return;
+    for(const k of Object.keys(S)) S[k] = {};
+    for(const r of rows){ if(S[r.col]) S[r.col][r.id] = Object.assign({}, r.data, {_par: r.updated_by, _le: r.updated_at}); }
+    loaded = true; dire("À jour à " + new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}).replace(":","h") + ". Ce que tu écris s'enregistre tout seul.");
+    render();
+  }catch(e){
+    if(e.code === "code_invalide"){ code = ""; store("mm_code", null); render(); dire("Ce code n'est pas le bon."); }
+    else dire("Pas de connexion pour l'instant. Tes notes partiront dès qu'elle revient.");
+  }
+}
+function save(col, id, patch){
+  S[col][id] = Object.assign({}, S[col][id], patch);
+  const key = col + "/" + id;
+  const p = (chains[key] || Promise.resolve()).then(() => envoyer(col, id, patch, 0));
+  chains[key] = p;
+  p.finally(() => { if(chains[key] === p) delete chains[key]; });
+}
+async function envoyer(col, id, patch, n){
+  try{ await rpc("mm_save", {p_code: code, p_col: col, p_id: id, p_patch: patch, p_qui: moi}); dire("Enregistré."); }
+  catch(e){
+    if(e.code === "code_invalide"){ dire("Ce code n'est plus le bon."); return; }
+    if(n < 5){ dire("Connexion faible, nouvel essai…"); await new Promise(r => setTimeout(r, 2000 * (n + 1))); return envoyer(col, id, patch, n + 1); }
+    dire("Non enregistré : pas de connexion. Garde la page ouverte et réessaie.");
+  }
+}
+
+/* ---------- compte rendu ---------- */
+function bilan(m){
+  const c = {b:0, m:0, p:0}, pbs = [], moyens = [];
+  for(const [k, lab] of POINTS){
+    const v = m["p_" + k]; if(!v || !v.e) continue;
+    c[v.e]++;
+    if(v.e === "p") pbs.push([lab, v.n]); else if(v.e === "m") moyens.push([lab, v.n]);
+  }
+  return {c, pbs, moyens, n: c.b + c.m + c.p};
+}
+function bilanChips(m){
+  const b = bilan(m); if(!b.n) return "";
+  return `<div class="chips">${b.c.b ? `<span class="pill ok">${b.c.b} bien</span>` : ""}${b.c.m ? `<span class="pill moyen">${b.c.m} moyen</span>` : ""}${b.c.p ? `<span class="pill pb">${b.c.p} problème${b.c.p > 1 ? "s" : ""}</span>` : ""}</div>`;
+}
+function coeurs(v){ let h = ""; for(let i = 1; i <= 5; i++) h += `<span class="${i <= v ? "on" : ""}">♥</span>`; return `<span class="hearts" style="display:inline-flex">${h}</span>`; }
+
+/* ---------- vues ---------- */
+function vueCode(){
+  return `<header><h1>Marina et Mathieu</h1><p class="sub">Notre espace à deux</p></header>
+  <form class="card" id="f-code">
+    <span class="lab">Qui es-tu ?</span>
+    <div class="duo"><button type="button" class="btn ghost ${moi === "Marina" ? "sel" : ""}" data-moi="Marina">Marina</button><button type="button" class="btn ghost ${moi === "Mathieu" ? "sel" : ""}" data-moi="Mathieu">Mathieu</button></div>
+    <label><span class="lab">Notre code</span><input type="password" id="in-code" autocomplete="current-password" autocapitalize="none" required></label>
+    <button class="btn" type="submit">Entrer</button>
+    <p class="small">À faire une seule fois sur ce téléphone.</p>
+  </form>`;
+}
+function prochaines(){
+  const now = Date.now() - 3 * 36e5;
+  return sorted(S.maisons).filter(([,m]) => m.visiteLe && m.statut !== "ecartee" && new Date(m.visiteLe).getTime() >= now)
+    .sort((a,b) => new Date(a[1].visiteLe) - new Date(b[1].visiteLe));
+}
+function vueAccueil(){
+  const v = prochaines(), n = sorted(S.maisons).filter(([,m]) => m.statut !== "ecartee").length;
+  const mot = (S.meta.page || {}).mot;
+  return `<header class="bar"><div><h1>Marina et Mathieu</h1><p class="sub">Bonjour ${esc(moi)}</p></div></header>
+  <section><h2>Nos dossiers</h2>
+    <a class="card" href="#maisons">
+      <div class="top"><h3>Recherche de maison</h3><span class="pill s-visite-calee">${n} maison${n > 1 ? "s" : ""}</span></div>
+      ${mot ? `<p>${esc(mot)}</p>` : ""}
+      ${v.length ? `<p class="small">Prochaine visite : ${quand(v[0][1].visiteLe)}, ${esc(v[0][1].nom)}</p>` : `<p class="small">Pas de visite datée.</p>`}
+    </a>
+  </section>
+  <p class="small"><button class="back" id="sortir">Changer de personne ou de code</button></p>`;
+}
+function carteMaison(id, m){
+  const st = STATUTS[m.statut] ? m.statut : "a-caler";
+  return `<a class="card${st === "ecartee" ? " off" : ""}" href="#m-${esc(id)}">
+    <div class="top"><div><h3>${esc(m.nom)}</h3><span class="pill s-${st}">${STATUTS[st]}</span></div><div class="prix">${euros(m.prix)}</div></div>
+    ${m.visiteLe && st !== "ecartee" ? `<p><strong>Visite :</strong> ${quand(m.visiteLe)}</p>` : ""}
+    <div class="chips">${[m.surface, m.chambres, m.terrain].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join("")}</div>
+    ${bilanChips(m)}
+    ${(m.coeurMarina || m.coeurMathieu) ? `<p class="small">Marina ${coeurs(m.coeurMarina || 0)} &nbsp; Mathieu ${coeurs(m.coeurMathieu || 0)}</p>` : ""}
+    <span class="small">Ouvrir la fiche et le compte rendu de visite</span>
+  </a>`;
+}
+function vueMaisons(){
+  const v = prochaines(), ms = sorted(S.maisons), ts = sorted(S.taches), cs = sorted(S.contacts);
+  return `<button class="back" data-go="">‹ Nos dossiers</button>
+  <header><h1>Recherche de maison</h1><p class="sub">350 000 € tout compris · compromis avant Noël · chez le notaire avant le 8 avril 2027</p></header>
+  <section><h2>Prochaines visites</h2><div class="list">${v.length ? v.map(([id,m]) => `<a class="row" href="#m-${esc(id)}" style="text-decoration:none;color:inherit"><div><strong>${quand(m.visiteLe)}</strong><br>${esc(m.nom)}</div><span class="pill qui">Ouvrir</span></a>`).join("") : `<div class="row"><span class="vide">Pas de visite datée pour l'instant.</span></div>`}</div></section>
+  <section><h2>Les maisons</h2>${ms.length ? ms.map(([id,m]) => carteMaison(id,m)).join("") : `<p class="vide">Aucune maison pour l'instant.</p>`}
+    <details class="card"><summary>Ajouter une maison</summary>
+      <form class="col" id="f-add">
+        <input type="text" id="add-nom" placeholder="Commune ou nom" required>
+        <input type="text" id="add-prix" placeholder="Prix affiché" inputmode="numeric">
+        <input type="url" id="add-lien" placeholder="Lien de l'annonce">
+        <button class="btn" type="submit">Ajouter</button>
+      </form></details>
+  </section>
+  <section><h2>À faire</h2><div class="list">${ts.map(([id,x]) => `<label class="row"><input type="checkbox" data-tache="${esc(id)}" ${x.fait ? "checked" : ""}><span><span class="${x.fait ? "fait" : ""}">${esc(x.texte)}</span>${x.detail ? `<br><span class="small">${esc(x.detail)}</span>` : ""}</span>${x.qui ? `<span class="pill qui">${esc(x.qui)}</span>` : ""}</label>`).join("") || `<div class="row"><span class="vide">Rien à faire.</span></div>`}</div>
+    <form class="bar" id="f-tache"><input type="text" id="tache-txt" placeholder="Ajouter une chose à faire" required><button class="btn" type="submit">OK</button></form>
+  </section>
+  <section><h2>Courtier et notaire</h2><div class="list">${cs.map(([,x]) => `<div class="row"><div><strong>${esc(x.nom)}</strong><br><span class="small">${[x.type, x.tel, x.adresse].filter(Boolean).map(esc).join(" · ")}</span>${x.note ? `<br><span class="small">${esc(x.note)}</span>` : ""}</div></div>`).join("") || `<div class="row"><span class="vide">Pas encore de contact.</span></div>`}</div></section>`;
+}
+function champ(id, f, lab, ph){
+  const m = S.maisons[id];
+  return `<label><span class="lab">${lab}</span><textarea data-id="${esc(id)}" data-f="${f}" placeholder="${esc(ph || "")}">${esc(m[f] || "")}</textarea></label>`;
+}
+function vueMaison(id){
+  const m = S.maisons[id];
+  if(!m) return `<button class="back" data-go="maisons">‹ Les maisons</button><p class="vide">Cette maison n'existe plus.</p>`;
+  const st = STATUTS[m.statut] ? m.statut : "a-caler", lien = safeUrl(m.lien), b = bilan(m);
+  const monCoeur = moi === "Marina" ? "coeurMarina" : "coeurMathieu", autre = moi === "Marina" ? "Mathieu" : "Marina", sonCoeur = moi === "Marina" ? "coeurMathieu" : "coeurMarina";
+  let h = "";
+  for(let i = 1; i <= 5; i++) h += `<button type="button" class="${i <= (m[monCoeur] || 0) ? "on" : ""}" data-id="${esc(id)}" data-coeur="${monCoeur}" data-v="${i}" aria-label="${i} sur 5">♥</button>`;
+  const cr = b.n || m.plus || m.moins || m.coeurMarina || m.coeurMathieu ? `<section><h2>Compte rendu</h2><div class="card">
+      ${bilanChips(m) || `<p class="vide">Aucun point noté pour l'instant.</p>`}
+      ${b.pbs.length ? `<div><span class="lab">Problèmes</span><ul class="pbs">${b.pbs.map(([l,n]) => `<li><strong>${esc(l)}</strong>${n ? " : " + esc(n) : ""}</li>`).join("")}</ul></div>` : ""}
+      ${b.moyens.length ? `<div><span class="lab">Moyen</span><ul class="pbs">${b.moyens.map(([l,n]) => `<li><strong>${esc(l)}</strong>${n ? " : " + esc(n) : ""}</li>`).join("")}</ul></div>` : ""}
+      ${m.plus ? `<div><span class="lab">Ce qui nous plaît</span><p class="txt">${esc(m.plus)}</p></div>` : ""}
+      ${m.moins ? `<div><span class="lab">Ce qui nous gêne</span><p class="txt">${esc(m.moins)}</p></div>` : ""}
+      <p class="small">Marina ${coeurs(m.coeurMarina || 0)} &nbsp; Mathieu ${coeurs(m.coeurMathieu || 0)}</p>
+      ${m._par ? `<p class="small">Dernière note : ${esc(m._par)}, ${quand(m._le)}</p>` : ""}
+    </div></section>` : "";
+  return `<button class="back" data-go="maisons">‹ Les maisons</button>
+  <header><div class="top"><h1>${esc(m.nom)}</h1><div class="prix">${euros(m.prix)}</div></div>
+    ${m.prixNote ? `<p class="small">${esc(m.prixNote)}</p>` : ""}</header>
+  <div class="card">
+    <div class="chips">${[m.surface, m.chambres, m.terrain, m.extras, m.dpe, m.trajet, m.bus].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join("")}</div>
+    ${m.total ? `<p class="small">Budget estimé : ${esc(m.total)}</p>` : ""}
+    <p class="small">${m.agence ? esc(m.agence) + " · " : ""}${lien ? `<a href="${esc(lien)}" target="_blank" rel="noopener">Voir l'annonce</a>` : ""}</p>
+    <div class="col">
+      <label><span class="lab">Où on en est</span><select data-id="${esc(id)}" data-f="statut">${Object.entries(STATUTS).map(([k,v]) => `<option value="${k}"${k === st ? " selected" : ""}>${v}</option>`).join("")}</select></label>
+      <label><span class="lab">Date de visite</span><input type="datetime-local" data-id="${esc(id)}" data-f="visiteLe" value="${esc(m.visiteLe || "")}"></label>
+    </div>
+  </div>
+  ${cr}
+  <section><h2>Ma visite, point par point</h2>
+    <p class="small">Touche Bien, Moyen ou Problème. Un mot si besoin. Rien n'est obligatoire.</p>
+    <div class="card">${POINTS.map(([k, lab]) => { const v = m["p_" + k] || {}; return `<div class="point"><strong>${lab}</strong>
+      <div class="tri">${Object.entries(ETATS).map(([e, t]) => `<button type="button" class="${v.e === e ? "on-" + e : ""}" data-id="${esc(id)}" data-pt="${k}" data-e="${e}">${t}</button>`).join("")}</div>
+      <input type="text" data-id="${esc(id)}" data-ptn="${k}" value="${esc(v.n || "")}" placeholder="Un mot (facultatif)"></div>`; }).join("")}</div>
+  </section>
+  <section><h2>Mon avis</h2><div class="card">
+    <div><span class="lab">Mon coup de cœur</span><div class="hearts">${h}</div></div>
+    <p class="small">${autre} : ${m[sonCoeur] ? coeurs(m[sonCoeur]) : "pas encore noté"}</p>
+    ${champ(id, "plus", "Ce qui nous plaît", "")}
+    ${champ(id, "moins", "Ce qui nous gêne", "")}
+    ${champ(id, "travaux", "Travaux à prévoir", "Ce qu'on a vu, ce que l'agent a dit")}
+    ${champ(id, "questions", "Questions pour l'agence", "Depuis quand en vente, offres reçues, taxe foncière…")}
+    ${champ(id, "notes", "Autres notes", "")}
+  </div></section>
+  <details class="card"><summary>Modifier la fiche</summary><div class="col">
+    ${[["nom","Nom"],["prix","Prix affiché"],["surface","Surface"],["chambres","Chambres"],["terrain","Terrain"],["agence","Agence, contact"],["lien","Lien de l'annonce"]].map(([f,l]) => `<label><span class="lab">${l}</span><input type="text" data-id="${esc(id)}" data-f="${f}" value="${esc(m[f] ?? "")}"></label>`).join("")}
+  </div></details>`;
+}
+
+function render(){
+  const a = document.activeElement;
+  if(a && app.contains(a) && /TEXTAREA|INPUT|SELECT/.test(a.tagName) && a.type !== "checkbox" && code && loaded){ dirty = true; return; }
+  dirty = false;
+  const h = location.hash.slice(1);
+  let html;
+  if(!code || !moi) html = vueCode();
+  else if(!loaded) html = `<header><h1>Marina et Mathieu</h1></header><p class="vide">Chargement…</p>`;
+  else if(h === "maisons") html = vueMaisons();
+  else if(h.startsWith("m-")) html = vueMaison(h.slice(2));
+  else html = vueAccueil();
+  const open = [...app.querySelectorAll("details[open]")].length > 0 && h.startsWith("m-");
+  app.innerHTML = html;
+  if(open){ const d = app.querySelector("details"); if(d) d.open = true; }
+}
+
+/* ---------- gestes ---------- */
+app.addEventListener("click", ev => {
+  const t = ev.target.closest("button"); if(!t) return;
+  if(t.dataset.moi){ moi = t.dataset.moi; store("mm_moi", moi); const c = document.getElementById("in-code").value; render(); document.getElementById("in-code").value = c; return; }
+  if(t.dataset.go !== undefined){ location.hash = t.dataset.go; return; }
+  if(t.id === "sortir"){ code = ""; moi = ""; loaded = false; store("mm_code", null); store("mm_moi", null); render(); dire(""); return; }
+  if(t.dataset.coeur){
+    const id = t.dataset.id, f = t.dataset.coeur, v = Number(t.dataset.v), nv = (S.maisons[id] || {})[f] === v ? 0 : v;
+    save("maisons", id, {[f]: nv});
+    t.parentElement.querySelectorAll("button").forEach((x, i) => x.classList.toggle("on", i < nv)); return;
+  }
+  if(t.dataset.pt){
+    const id = t.dataset.id, k = "p_" + t.dataset.pt, cur = Object.assign({}, (S.maisons[id] || {})[k]);
+    cur.e = cur.e === t.dataset.e ? "" : t.dataset.e;
+    save("maisons", id, {[k]: cur});
+    t.parentElement.querySelectorAll("button").forEach(x => { x.className = x.dataset.e === cur.e ? "on-" + cur.e : ""; });
+    if(cur.e && (S.maisons[id].statut === "a-caler" || S.maisons[id].statut === "visite-calee")) save("maisons", id, {statut: "visitee"});
+  }
+});
+app.addEventListener("change", ev => {
+  const t = ev.target;
+  if(t.dataset.f){
+    let v = t.value;
+    if(t.dataset.f === "prix"){ const n = parseInt(v.replace(/\D/g, ""), 10); v = isNaN(n) ? "" : n; }
+    if(t.dataset.f === "lien") v = safeUrl(v.trim());
+    save("maisons", t.dataset.id, {[t.dataset.f]: v});
+  } else if(t.dataset.ptn){
+    const id = t.dataset.id, k = "p_" + t.dataset.ptn, cur = Object.assign({}, (S.maisons[id] || {})[k]);
+    cur.n = t.value.trim(); save("maisons", id, {[k]: cur});
+  } else if(t.dataset.tache){
+    save("taches", t.dataset.tache, {fait: t.checked}); render();
+  }
+});
+app.addEventListener("focusout", () => setTimeout(() => { if(dirty) render(); }, 500));
+app.addEventListener("submit", ev => {
+  ev.preventDefault();
+  const f = ev.target;
+  if(f.id === "f-code"){
+    if(!moi){ dire("Choisis d'abord Marina ou Mathieu."); return; }
+    code = document.getElementById("in-code").value.trim(); store("mm_code", code); loaded = false; dire("Vérification…"); render(); charger();
+  } else if(f.id === "f-add"){
+    const nom = document.getElementById("add-nom").value.trim(); if(!nom) return;
+    const p = parseInt(document.getElementById("add-prix").value.replace(/\D/g, ""), 10);
+    const id = "n" + Date.now().toString(36);
+    save("maisons", id, {ordre: 50, nom, prix: isNaN(p) ? "" : p, lien: safeUrl(document.getElementById("add-lien").value.trim()), statut: "a-caler", visiteLe: "", coeurMarina: 0, coeurMathieu: 0});
+    document.activeElement.blur(); dirty = false; location.hash = "m-" + id;
+  } else if(f.id === "f-tache"){
+    const txt = document.getElementById("tache-txt").value.trim(); if(!txt) return;
+    save("taches", "n" + Date.now().toString(36), {ordre: 60, texte: txt, qui: moi, fait: false});
+    document.activeElement.blur(); dirty = false; render();
+  }
+});
+window.addEventListener("hashchange", () => { dirty = false; if(document.activeElement) document.activeElement.blur(); render(); window.scrollTo(0, 0); });
+document.addEventListener("visibilitychange", () => { if(!document.hidden) charger(); });
+setInterval(() => { if(!document.hidden) charger(); }, 25000);
+
+code = store("mm_code"); moi = store("mm_moi");
+render(); charger();
+</script>
+</body>
+</html>
