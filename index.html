@@ -68,6 +68,7 @@ textarea{min-height:64px;resize:vertical}
 .hearts .on{color:var(--heart)}
 .hearts.pt{display:inline-flex;gap:0;vertical-align:middle}
 .hearts.pt span{font-size:17px;padding:0 1px}
+.hearts.st .on{color:#d99a00}
 .point{border-top:1px solid var(--line);padding:12px 0;display:flex;flex-direction:column;gap:8px}
 .point:first-child{border-top:0;padding-top:0}
 .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
@@ -200,6 +201,8 @@ function bilanChips(m){
   const b = bilan(m); if(!b.n) return "";
   return `<div class="chips">${b.c.b ? `<span class="pill ok">${b.c.b} bien</span>` : ""}${b.c.m ? `<span class="pill moyen">${b.c.m} moyen</span>` : ""}${b.c.p ? `<span class="pill pb">${b.c.p} problème${b.c.p > 1 ? "s" : ""}</span>` : ""}</div>`;
 }
+function etoiles(v){ let h = ""; for(let i = 1; i <= 5; i++) h += `<span class="${i <= v ? "on" : ""}">★</span>`; return `<span class="hearts pt st">${h}</span>`; }
+function moyEt(m){ const a = [m.etoilesMarina, m.etoilesMathieu].filter(x => x > 0); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : (m.jcNote || 0); }
 function coeurs(v){ let h = ""; for(let i = 1; i <= 5; i++) h += `<span class="${i <= v ? "on" : ""}">♥</span>`; return `<span class="hearts pt">${h}</span>`; }
 
 /* ---------- vues ---------- */
@@ -359,8 +362,9 @@ function carteMaison(id, m){
       <div class="col" style="gap:6px;min-width:0"><h3>${esc(m.nom)}</h3><div><span class="pill s-${st}">${STATUTS[st]}</span></div>
         ${m.visiteLe ? `<p><strong>Visite :</strong> ${quand(m.visiteLe)}</p>` : ""}</div>
       <div class="droite"><div class="prix">${euros(m.prix)}</div>
-        <div class="small">Marina ${coeurs(m.coeurMarina || 0)}</div>
-        <div class="small">Mathieu ${coeurs(m.coeurMathieu || 0)}</div></div>
+        ${st === "visitee" || st === "offre" ? `<div class="small">Marina ${coeurs(m.coeurMarina || 0)}</div>
+        <div class="small">Mathieu ${coeurs(m.coeurMathieu || 0)}</div>` : `<div class="small">Marina ${etoiles(m.etoilesMarina || 0)}</div>
+        <div class="small">Mathieu ${etoiles(m.etoilesMathieu || 0)}</div>`}</div>
     </div>
     <div class="chips">${[m.surface, m.chambres, m.terrain].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join("")}</div>
     ${bilanChips(m)}
@@ -368,7 +372,9 @@ function carteMaison(id, m){
 }
 function vueMaisons(){
   const v = prochaines(), all = actifs(S.maisons), cs = actifs(S.contacts);
-  const ms = all.filter(([,m]) => m.statut !== "ecartee"), ec = all.filter(([,m]) => m.statut === "ecartee");
+  const rang = m => m.statut === "offre" ? 0 : m.statut === "visitee" ? 1 : m.statut === "visite-calee" ? 2 : 3;
+  const ms = all.filter(([,m]) => m.statut !== "ecartee").sort((a, b) => rang(a[1]) - rang(b[1]) || moyEt(b[1]) - moyEt(a[1]) || (a[1].ordre ?? 99) - (b[1].ordre ?? 99));
+  const ec = all.filter(([,m]) => m.statut === "ecartee");
   const e = Number.isInteger((S.meta.page || {}).etape) ? S.meta.page.etape : 1;
   const crit = Array.isArray((S.meta.criteres || {}).liste) ? S.meta.criteres.liste : [];
   const n = jours("2026-12-24"), a = jours("2027-04-08");
@@ -407,6 +413,7 @@ function vueMaison(id){
   if(!m || m.supprime) return `<button class="back" data-go="maisons">‹ Les maisons</button><p class="vide">Cette maison n'existe plus.</p>`;
   const st = STATUTS[m.statut] ? m.statut : "a-caler", lien = safeUrl(m.lien), b = bilan(m);
   const monCoeur = moi === "Marina" ? "coeurMarina" : "coeurMathieu", autre = moi === "Marina" ? "Mathieu" : "Marina", sonCoeur = moi === "Marina" ? "coeurMathieu" : "coeurMarina";
+  const mesEt = moi === "Marina" ? "etoilesMarina" : "etoilesMathieu", sesEt = moi === "Marina" ? "etoilesMathieu" : "etoilesMarina";
   let h = "";
   for(let i = 1; i <= 5; i++) h += `<button type="button" class="${i <= (m[monCoeur] || 0) ? "on" : ""}" data-id="${esc(id)}" data-coeur="${monCoeur}" data-v="${i}" aria-label="${i} sur 5">♥</button>`;
   const cr = b.n || m.plus || m.moins || m.coeurMarina || m.coeurMathieu ? `<section><h2>Compte rendu</h2><div class="card">
@@ -427,9 +434,15 @@ function vueMaison(id){
     <p class="small">${m.agence ? esc(m.agence) + " · " : ""}${lien ? `<a href="${esc(lien)}" target="_blank" rel="noopener">Voir l'annonce</a>` : ""}</p>
     <div class="col">
       <label><span class="lab">Où on en est</span><select data-id="${esc(id)}" data-f="statut">${Object.entries(STATUTS).map(([k,v]) => `<option value="${k}"${k === st ? " selected" : ""}>${v}</option>`).join("")}</select></label>
-      ${st === "ecartee" ? `<label><span class="lab">Pourquoi on l'écarte</span><input type="text" data-id="${esc(id)}" data-f="motif" value="${esc(m.motif || "")}" placeholder="Trop de travaux, trop loin, trop cher…"></label>` : `<label><span class="lab">Date de visite</span><input type="datetime-local" data-id="${esc(id)}" data-f="visiteLe" value="${esc(m.visiteLe || "")}"></label>`}
+      ${st === "ecartee" ? `<label><span class="lab">Pourquoi on l'écarte</span><input type="text" data-id="${esc(id)}" data-f="motif" value="${esc(m.motif || "")}" placeholder="Trop de travaux, trop loin, trop cher…"></label>` : `<div><label><span class="lab">Date de visite</span><input type="datetime-local" data-id="${esc(id)}" data-f="visiteLe" value="${esc(m.visiteLe || "")}"></label>${m.visiteLe ? `<button type="button" class="x" style="margin-top:6px" data-raz="${esc(id)}">Effacer la date de visite</button>` : ""}</div>`}
     </div>
   </div>
+  <section><h2>L'annonce vaut-elle une visite ?</h2><div class="card">
+    <div><span class="lab">Mon envie de visiter</span><div class="hearts st">${[1,2,3,4,5].map(i => `<button type="button" class="${i <= (m[mesEt] || 0) ? "on" : ""}" data-id="${esc(id)}" data-coeur="${mesEt}" data-v="${i}" aria-label="${i} sur 5">★</button>`).join("")}</div></div>
+    <p class="small">${autre} : ${m[sesEt] ? etoiles(m[sesEt]) : "pas encore noté"}</p>
+    ${m.jcAvis ? `<div><span class="lab">Avis de JC sur l'annonce ${m.jcNote ? etoiles(m.jcNote) : ""}</span><p class="small txt">${esc(m.jcAvis)}</p></div>` : ""}
+    ${champ(id, "avisAnnonce", "Ce qu'on pense de l'annonce", "Ce qui donne envie, ce qui inquiète, ce qu'il manque")}
+  </div></section>
   ${cr}
   <section><h2>Ma visite, point par point</h2>
     <p class="small">Touche Bien, Moyen ou Problème. Un mot si besoin. Rien n'est obligatoire.</p>
@@ -487,6 +500,11 @@ app.addEventListener("click", ev => {
     save(col, id, {supprime: true});
     if(col === "dossiers") location.hash = ""; else render();
     return;
+  }
+  if(t.dataset.raz){
+    const cur = S.maisons[t.dataset.raz] || {}, patch = {visiteLe: ""};
+    if(cur.statut === "visite-calee") patch.statut = "a-caler";
+    save("maisons", t.dataset.raz, patch); dirty = false; render(); return;
   }
   if(t.dataset.etape){ save("meta", "page", {etape: Number(t.dataset.etape)}); render(); return; }
   if(t.dataset.coeur){
