@@ -51,6 +51,7 @@ a.card,button.card{text-decoration:none;color:inherit;font:inherit;text-align:le
 .moyen{background:var(--warn-soft);color:var(--warn)}
 .pb{background:var(--bad-soft);color:var(--bad)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips:empty{display:none}
 .chip{background:var(--bg);border-radius:8px;padding:3px 8px;font-size:14px}
 .mot{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-weight:500}
 .lab{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
@@ -100,6 +101,7 @@ details[open] summary{margin-bottom:10px}
 .x.arm{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
 .rowl{display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0}
 .card.mini{padding:10px 16px;gap:4px}
+.droite{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none;white-space:nowrap}
 ul.crit{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
 .bar select{width:auto;flex:none}
 </style>
@@ -264,12 +266,15 @@ function carteMaison(id, m){
     <div class="top"><strong>${esc(m.nom)}</strong><span class="pill s-ecartee">Écartée</span></div>
     <p class="small">${m.motif ? "Motif : " + esc(m.motif) : "Motif à noter"}</p></a>`;
   return `<a class="card" href="#m-${esc(id)}">
-    <div class="top"><div><h3>${esc(m.nom)}</h3><span class="pill s-${st}">${STATUTS[st]}</span></div><div class="prix">${euros(m.prix)}</div></div>
-    ${m.visiteLe ? `<p><strong>Visite :</strong> ${quand(m.visiteLe)}</p>` : ""}
+    <div class="top">
+      <div class="col" style="gap:6px;min-width:0"><h3>${esc(m.nom)}</h3><div><span class="pill s-${st}">${STATUTS[st]}</span></div>
+        ${m.visiteLe ? `<p><strong>Visite :</strong> ${quand(m.visiteLe)}</p>` : ""}</div>
+      <div class="droite"><div class="prix">${euros(m.prix)}</div>
+        <div class="small">Marina ${coeurs(m.coeurMarina || 0)}</div>
+        <div class="small">Mathieu ${coeurs(m.coeurMathieu || 0)}</div></div>
+    </div>
     <div class="chips">${[m.surface, m.chambres, m.terrain].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join("")}</div>
     ${bilanChips(m)}
-    <p class="small">Marina ${coeurs(m.coeurMarina || 0)} &nbsp; Mathieu ${coeurs(m.coeurMathieu || 0)}</p>
-    <span class="small">Ouvrir la fiche et le compte rendu de visite</span>
   </a>`;
 }
 function vueMaisons(){
@@ -286,10 +291,10 @@ function vueMaisons(){
     <div class="fact"><b>${a >= 0 ? "J-" + a : "8 avril"}</b><span>avant le 8 avril, signature chez le notaire</span></div>
   </div>
   <div class="steps" role="group" aria-label="Où on en est">${ETAPES.map((x,i) => `<button type="button" class="${i+1 < e ? "done" : i+1 === e ? "now" : ""}" data-etape="${i+1}">${x}</button>`).join("")}</div>
-  <section><h2>Nos critères</h2><div class="card">
+  <details class="card" id="det-criteres"><summary>Nos critères</summary>
     ${crit.length ? `<ul class="crit">${crit.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : `<p class="vide">Pas encore de critères.</p>`}
-    <details id="det-crit"><summary>Modifier les critères</summary><textarea id="crit-txt" data-crit="1" style="min-height:200px" aria-label="Un critère par ligne">${esc(crit.join("\n"))}</textarea><p class="small">Un critère par ligne.</p></details>
-  </div></section>
+    <details id="det-crit" style="margin-top:10px"><summary>Modifier les critères</summary><textarea id="crit-txt" data-crit="1" style="min-height:200px" aria-label="Un critère par ligne">${esc(crit.join("\n"))}</textarea><p class="small">Un critère par ligne.</p></details>
+  </details>
   <section><h2>Prochaines visites</h2><div class="list">${v.length ? v.map(([id,m]) => `<a class="row" href="#m-${esc(id)}" style="text-decoration:none;color:inherit"><div><strong>${quand(m.visiteLe)}</strong><br>${esc(m.nom)}</div><span class="pill qui">Ouvrir</span></a>`).join("") : `<div class="row"><span class="vide">Pas de visite datée pour l'instant.</span></div>`}</div></section>
   <section><h2>Les maisons</h2>${ms.length ? ms.map(([id,m]) => carteMaison(id,m)).join("") : `<p class="vide">Aucune maison en cours.</p>`}
     <details class="card" id="det-add"><summary>Ajouter une maison</summary>
