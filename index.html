@@ -105,6 +105,7 @@ details[open] summary{margin-bottom:10px}
 .droite{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none;white-space:nowrap}
 ul.crit{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
 .bar select{width:auto;flex:none}
+input.cout{width:74px;flex:none;padding:6px 8px;text-align:right}
 </style>
 </head>
 <body>
@@ -142,10 +143,25 @@ function jours(iso){ return Math.ceil((new Date(iso + "T23:59:00") - new Date())
 function actifs(o){ return sorted(o).filter(([,x]) => !x.supprime); }
 const ETAPES = ["Visites","Offre","Compromis","Prêt","Signature"];
 function tachesDe(dossier){ return actifs(S.taches).filter(([,x]) => (x.dossier || "maison") === dossier); }
+function ligneTache(id, x, couts){
+  return `<div class="row"><label class="rowl"><input type="checkbox" data-tache="${esc(id)}" ${x.fait ? "checked" : ""}><span><span class="${x.fait ? "fait" : ""}">${esc(x.texte)}</span>${x.detail ? `<br><span class="small">${esc(x.detail)}</span>` : ""}${x.qui ? `<br><span class="small">${esc(x.qui)}</span>` : ""}</span></label>${couts ? `<input type="text" class="cout" inputmode="numeric" data-tcout="${esc(id)}" value="${x.cout ? esc(x.cout) : ""}" placeholder="€" aria-label="Coût prévu en euros">` : ""}<button type="button" class="x" data-del="taches/${esc(id)}" aria-label="Supprimer cette tâche">✕</button></div>`;
+}
 function blocTaches(dossier){
-  const ts = tachesDe(dossier);
-  return `<div class="list">${ts.map(([id,x]) => `<div class="row"><label class="rowl"><input type="checkbox" data-tache="${esc(id)}" ${x.fait ? "checked" : ""}><span><span class="${x.fait ? "fait" : ""}">${esc(x.texte)}</span>${x.detail ? `<br><span class="small">${esc(x.detail)}</span>` : ""}${x.qui ? `<br><span class="small">${esc(x.qui)}</span>` : ""}</span></label><button type="button" class="x" data-del="taches/${esc(id)}" aria-label="Supprimer cette tâche">✕</button></div>`).join("") || `<div class="row"><span class="vide">Rien à faire pour l'instant.</span></div>`}</div>
-    <form class="bar f-tache" data-dossier="${esc(dossier)}"><input type="text" name="txt" placeholder="Ajouter une chose à faire" required><select name="qui" aria-label="Pour qui"><option>À deux</option><option>Marina</option><option>Mathieu</option></select><button class="btn" type="submit">OK</button></form>`;
+  const ts = tachesDe(dossier), d = S.dossiers[dossier] || {}, phases = Array.isArray(d.phases) ? d.phases : [], couts = !!d.couts;
+  const form = `<form class="col f-tache" data-dossier="${esc(dossier)}"><input type="text" name="txt" placeholder="Ajouter une chose à faire" required>
+      <div class="bar">${phases.length ? `<select name="phase" aria-label="Étape" style="flex:1;width:auto;min-width:0">${phases.map(p => `<option>${esc(p)}</option>`).join("")}</select>` : ""}<select name="qui" aria-label="Pour qui"><option>À deux</option><option>Marina</option><option>Mathieu</option></select><button class="btn" type="submit">OK</button></div></form>`;
+  if(!phases.length) return `<div class="list">${ts.map(([id,x]) => ligneTache(id, x, couts)).join("") || `<div class="row"><span class="vide">Rien à faire pour l'instant.</span></div>`}</div>${form}`;
+  const faites = ts.filter(([,x]) => x.fait).length, total = ts.reduce((s, [,x]) => s + num(x.cout), 0);
+  const groupes = phases.map(p => [p, ts.filter(([,x]) => x.phase === p)]);
+  const autres = ts.filter(([,x]) => !phases.includes(x.phase));
+  if(autres.length) groupes.push(["Sans étape", autres]);
+  const enCours = groupes.findIndex(([,l]) => l.some(([,x]) => !x.fait));
+  return `<div class="card"><div class="top"><span><strong>${faites} sur ${ts.length}</strong> choses faites</span>${couts ? `<span>Coûts prévus : <strong>${eur(total)}</strong></span>` : ""}</div>
+      <p class="small">${enCours >= 0 ? "Étape en cours : " + esc(groupes[enCours][0]) : "Tout est fait."}</p></div>
+    ${groupes.map(([p, l], i) => { const f = l.filter(([,x]) => x.fait).length, c = l.reduce((s, [,x]) => s + num(x.cout), 0);
+      return `<details class="card" id="ph-${i}"${i === enCours ? " open" : ""}><summary>${i + 1}. ${esc(p)} <span class="pill ${l.length && f === l.length ? "ok" : "gris"}">${f}/${l.length}</span>${couts && c ? ` <span class="small">${eur(c)}</span>` : ""}</summary>
+        <div>${l.map(([id,x]) => ligneTache(id, x, couts)).join("") || `<p class="vide">Rien dans cette étape.</p>`}</div></details>`; }).join("")}
+    ${form}`;
 }
 
 async function rpc(fn, body){
@@ -477,9 +493,9 @@ function render(){
   else if(h.startsWith("d-")) html = vueDossier(h.slice(2));
   else if(h === "budget") html = vueBudget();
   else html = vueAccueil();
-  const open = [...app.querySelectorAll("details[open]")].map(d => d.id).filter(Boolean);
+  const etats = {}; app.querySelectorAll("details").forEach(d => { if(d.id) etats[d.id] = d.open; });
   app.innerHTML = html;
-  for(const i of open){ const d = document.getElementById(i); if(d && vue === h) d.open = true; }
+  if(vue === h) for(const i in etats){ const d = document.getElementById(i); if(d) d.open = etats[i]; }
   vue = h;
   if(h === "budget" && code && loaded) resBudget();
 }
@@ -540,6 +556,9 @@ app.addEventListener("change", ev => {
   } else if(t.dataset.ptn){
     const id = t.dataset.id, k = "p_" + t.dataset.ptn, cur = Object.assign({}, (S.maisons[id] || {})[k]);
     cur.n = t.value.trim(); save("maisons", id, {[k]: cur});
+  } else if(t.dataset.tcout){
+    const n = parseInt(t.value.replace(/\D/g, ""), 10);
+    save("taches", t.dataset.tcout, {cout: isNaN(n) ? "" : n}); t.blur(); dirty = false; render();
   } else if(t.dataset.tache){
     save("taches", t.dataset.tache, {fait: t.checked}); render();
   }
@@ -564,7 +583,9 @@ app.addEventListener("submit", ev => {
     document.activeElement.blur(); dirty = false; location.hash = "m-" + id;
   } else if(f.classList.contains("f-tache")){
     const txt = f.elements.txt.value.trim(); if(!txt) return;
-    save("taches", "n" + Date.now().toString(36), {ordre: 60, texte: txt, qui: f.elements.qui.value, fait: false, dossier: f.dataset.dossier});
+    const nt = {ordre: 60, texte: txt, qui: f.elements.qui.value, fait: false, dossier: f.dataset.dossier};
+    if(f.elements.phase) nt.phase = f.elements.phase.value;
+    save("taches", "n" + Date.now().toString(36), nt);
     if(document.activeElement) document.activeElement.blur(); dirty = false; render();
   } else if(f.id === "f-dossier"){
     const titre = document.getElementById("dos-titre").value.trim(); if(!titre) return;
