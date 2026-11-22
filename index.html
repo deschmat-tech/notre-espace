@@ -115,6 +115,9 @@ input.cout{width:74px;flex:none;padding:6px 8px;text-align:right}
 .scen button{font:inherit;text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
 .scen button.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
 .droit{text-align:right;white-space:nowrap}
+.trv{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.trv select{width:auto;flex:1;min-width:0;padding:7px 8px;font-size:14px}
+.trv input.cout{width:92px}
 .top > span:first-child{min-width:0}
 </style>
 </head>
@@ -133,7 +136,7 @@ const POINTS = [
 ];
 const ETATS = {b:"Bien", m:"Moyen", p:"Problème"};
 const app = document.getElementById("app"), etat = document.getElementById("etat");
-const S = {maisons:{}, taches:{}, contacts:{}, meta:{}, dossiers:{}, budget:{}};
+const S = {maisons:{}, taches:{}, contacts:{}, meta:{}, dossiers:{}, budget:{}, travaux:{}};
 let code = "", moi = "", loaded = false, dirty = false, vue = null;
 const chains = {};
 
@@ -403,6 +406,54 @@ function vueBudget(){
     <p class="small">Estimation pour se repérer. Le courtier de chacun donnera les vrais chiffres.</p>
   </div></section>`;
 }
+/* Works budget: one doc per job in col "travaux" {dossier, lot, piece, texte, cout, mode, quand}. lot "deux" is split half each. */
+const LOTS = [["marina","Lot de Marina"],["mathieu","Lot de Mathieu"],["deux","Les deux lots"]];
+const PIECES = ["Toute la maison","Séjour","Cuisine","Entrée","WC","Salle de bain","Chambre 1","Chambre 2","Chambre 3","Chambre 4","Véranda","Garage","Toiture","Façades","Jardin","Chauffage","Électricité","Autre"];
+const MODES = ["Entreprise","Nous-mêmes"], QUANDS = ["Avant d'emménager","Plus tard"];
+function travauxDe(dossier){ return actifs(S.travaux).filter(([,x]) => (x.dossier || "") === dossier); }
+function totTravaux(dossier){
+  const t = {marina:{avant:0, tard:0, ent:0, nous:0}, mathieu:{avant:0, tard:0, ent:0, nous:0}, vides:0};
+  for(const [,x] of travauxDe(dossier)){
+    if(x.cout === "" || x.cout === undefined || x.cout === null){ t.vides++; continue; }
+    const c = num(x.cout), parts = x.lot === "deux" ? [["marina", c / 2], ["mathieu", c / 2]] : [[x.lot === "mathieu" ? "mathieu" : "marina", c]];
+    for(const [q, v] of parts){ t[q][x.quand === "Plus tard" ? "tard" : "avant"] += v; t[q][x.mode === "Nous-mêmes" ? "nous" : "ent"] += v; }
+  }
+  return t;
+}
+function ligneTravail(id, x){
+  const opt = (l, v) => l.map(o => `<option${o === v ? " selected" : ""}>${esc(o)}</option>`).join("");
+  return `<div class="point"><div class="top"><span><strong>${esc(x.texte)}</strong>${x.note ? `<br><span class="small">${esc(x.note)}</span>` : ""}</span><input type="text" class="cout" inputmode="numeric" data-tr="${esc(id)}" data-trf="cout" value="${x.cout === "" || x.cout === undefined || x.cout === null ? "" : esc(x.cout)}" placeholder="€" aria-label="Coût prévu en euros" style="width:92px"></div>
+    <div class="trv"><select data-tr="${esc(id)}" data-trf="mode" aria-label="Qui fait les travaux">${opt(MODES, x.mode || MODES[0])}</select><select data-tr="${esc(id)}" data-trf="quand" aria-label="Quand">${opt(QUANDS, x.quand || QUANDS[0])}</select><button type="button" class="x" data-del="travaux/${esc(id)}" aria-label="Supprimer ce travail">✕</button></div></div>`;
+}
+function vueTravaux(dossier){
+  const d = S.dossiers[dossier];
+  if(!d || d.supprime) return `<button class="back" data-go="">‹ Nos dossiers</button><p class="vide">Ce dossier n'existe plus.</p>`;
+  const all = travauxDe(dossier), t = totTravaux(dossier);
+  const res = (q, nom) => { const x = t[q], bud = num(bDoc(q).travaux), tot = x.avant + x.tard;
+    return `<div class="card"><h3>${nom}</h3>
+      ${ligne("Avant d'emménager", eur(x.avant), true)}
+      ${ligne("Plus tard", eur(x.tard))}
+      ${ligne("Total", eur(tot))}
+      <p class="small">Par des entreprises : ${eur(x.ent)} · par nous-mêmes : ${eur(x.nous)}</p>
+      <div class="top"><span class="small">Travaux comptés dans son budget</span><span class="pill ${Math.round(bud) === Math.round(x.avant) ? "ok" : "moyen"}">${eur(bud)}</span></div>
+      ${Math.round(bud) !== Math.round(x.avant) ? `<button type="button" class="btn ghost" data-trbud="${q}" data-v="${Math.round(x.avant)}">Mettre ${eur(x.avant)} dans son budget</button>` : ""}</div>`; };
+  return `<button class="back" data-go="d-${esc(dossier)}">‹ ${esc(d.titre)}</button>
+  <header><h1>Budget travaux</h1><p class="sub">Pièce par pièce : ce qu'il faut faire, qui le fait, combien ça coûte. Change un montant, les totaux suivent.</p></header>
+  <section><h2>Les totaux</h2>${res("marina", "Lot de Marina")}${res("mathieu", "Lot de Mathieu")}
+    <p class="small">Les travaux « Les deux lots » sont partagés moitié-moitié. Ce qui est « avant d'emménager » va dans le prêt ; le reste se fait plus tard.${t.vides ? ` ${t.vides} ligne${t.vides > 1 ? "s" : ""} sans montant.` : ""}</p></section>
+  ${LOTS.map(([k, nom]) => { const l = all.filter(([,x]) => (x.lot || "marina") === k); if(!l.length) return "";
+    const pieces = [...new Set(l.map(([,x]) => x.piece || "Autre"))];
+    return `<section><h2>${nom}</h2>${pieces.map(p => { const lp = l.filter(([,x]) => (x.piece || "Autre") === p), tp = lp.reduce((a, [,x]) => a + num(x.cout), 0);
+      return `<div class="card"><div class="top"><h3>${esc(p)}</h3><span class="prix">${eur(tp)}</span></div>${lp.map(([id, x]) => ligneTravail(id, x)).join("")}</div>`; }).join("")}</section>`; }).join("")}
+  <section><h2>Ajouter un travail</h2><form class="card" id="f-travail" data-dossier="${esc(dossier)}">
+    <div class="duo"><label><span class="lab">Quel lot</span><select name="lot">${LOTS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
+      <label><span class="lab">Quelle pièce</span><select name="piece">${PIECES.map(p => `<option>${p}</option>`).join("")}</select></label></div>
+    <label><span class="lab">Quoi faire</span><input type="text" name="txt" placeholder="Refaire entièrement, repeindre, changer le sol…" required></label>
+    <div class="duo"><label><span class="lab">Coût prévu</span><input type="text" name="cout" inputmode="numeric" placeholder="€"></label>
+      <label><span class="lab">Qui le fait</span><select name="mode">${MODES.map(m => `<option>${m}</option>`).join("")}</select></label></div>
+    <label><span class="lab">Quand</span><select name="quand">${QUANDS.map(m => `<option>${m}</option>`).join("")}</select></label>
+    <button class="btn" type="submit">Ajouter</button></form></section>`;
+}
 function blocSections(d){
   const ss = Array.isArray(d.sections) ? d.sections : [];
   return ss.map((s, i) => `<details class="card" id="sec-${i}"${s.ouvert ? " open" : ""}><summary>${esc(s.t)}${s.pill ? ` <span class="pill ${esc(s.ton || "gris")}">${esc(s.pill)}</span>` : ""}</summary><div class="col">
@@ -425,6 +476,7 @@ function vueDossier(id){
     <div><span class="lab">De quoi il s'agit</span>${d.description ? `<p class="txt">${esc(d.description)}</p>` : `<p class="vide">Pas encore écrit.</p>`}</div>
   </div>
   ${d.fiche && S.maisons[d.fiche] && !S.maisons[d.fiche].supprime ? `<a class="card mini" href="#m-${esc(d.fiche)}"><strong>Fiche de visite de la maison ›</strong><span class="small">Nos notes point par point, nos coups de cœur.</span></a>` : ""}
+  ${d.travaux ? (() => { const t = totTravaux(id); return `<a class="card mini" href="#t-${esc(id)}"><strong>Budget travaux ›</strong><span class="small">Pièce par pièce. Marina ${eur(t.marina.avant + t.marina.tard)} · Mathieu ${eur(t.mathieu.avant + t.mathieu.tard)}</span></a>`; })() : ""}
   ${d.budget ? `<a class="card mini" href="#budget"><strong>Budget de chacun ›</strong><span class="small">Revenus, crédit de la maison, charges, et ce qui reste à chacun.</span></a>` : ""}
   ${Array.isArray(d.liens) ? d.liens.filter(x => safeUrl(x[1])).map(x => `<a class="card mini" href="${esc(x[1])}" target="_blank" rel="noopener"><strong>${esc(x[0])} ›</strong></a>`).join("") : ""}
   ${Array.isArray(d.sections) && d.sections.length ? `<section><h2>L'étude</h2>${d.maj ? `<p class="small">Mise à jour le ${esc(d.maj)}. Touche un titre pour l'ouvrir.</p>` : ""}${blocSections(d)}</section>` : ""}
@@ -559,6 +611,7 @@ function render(){
   else if(h === "maisons") html = vueMaisons();
   else if(h.startsWith("m-")) html = vueMaison(h.slice(2));
   else if(h.startsWith("d-")) html = vueDossier(h.slice(2));
+  else if(h.startsWith("t-")) html = vueTravaux(h.slice(2));
   else if(h === "budget") html = vueBudget();
   else html = vueAccueil();
   const etats = {}; app.querySelectorAll("details").forEach(d => { if(d.id) etats[d.id] = d.open; });
@@ -574,6 +627,7 @@ app.addEventListener("click", ev => {
   if(t.dataset.moi){ moi = t.dataset.moi; store("mm_moi", moi); const c = document.getElementById("in-code").value; render(); document.getElementById("in-code").value = c; return; }
   if(t.dataset.go !== undefined){ location.hash = t.dataset.go; return; }
   if(t.id === "sortir"){ code = ""; moi = ""; loaded = false; store("mm_code", null); store("mm_moi", null); render(); dire(""); return; }
+  if(t.dataset.trbud){ save("budget", "aytre-" + t.dataset.trbud, {travaux: Number(t.dataset.v)}); dirty = false; render(); return; }
   if(t.dataset.scen){
     const x = ((S.budget["aytre-commun"] || {}).scenarios || [])[Number(t.dataset.scen)]; if(!x) return;
     save("budget", "aytre-marina", {prix: num(x.marina)}); save("budget", "aytre-mathieu", {prix: num(x.mathieu)}); dirty = false; render(); return;
@@ -631,6 +685,10 @@ app.addEventListener("change", ev => {
     if(t.dataset.f === "lien") v = safeUrl(v.trim());
     save("maisons", t.dataset.id, {[t.dataset.f]: v});
     if(t.dataset.f === "statut"){ t.blur(); dirty = false; render(); }
+  } else if(t.dataset.tr){
+    let v = t.value;
+    if(t.dataset.trf === "cout"){ const n = parseInt(v.replace(/\D/g, ""), 10); v = isNaN(n) ? "" : n; }
+    save("travaux", t.dataset.tr, {[t.dataset.trf]: v}); t.blur(); dirty = false; render();
   } else if(t.dataset.bq){
     save("budget", "aytre-" + t.dataset.bq, {[t.dataset.k]: t.value.trim() === "" ? "" : num(t.value)});
   } else if(t.dataset.bl){
@@ -685,6 +743,11 @@ app.addEventListener("submit", ev => {
     const nt = {ordre: 60, texte: txt, qui: f.elements.qui.value, fait: false, dossier: f.dataset.dossier};
     if(f.elements.phase) nt.phase = f.elements.phase.value;
     save("taches", "n" + Date.now().toString(36), nt);
+    if(document.activeElement) document.activeElement.blur(); dirty = false; render();
+  } else if(f.id === "f-travail"){
+    const txt = f.elements.txt.value.trim(); if(!txt) return;
+    const n = parseInt(f.elements.cout.value.replace(/\D/g, ""), 10);
+    save("travaux", "n" + Date.now().toString(36), {ordre: 60, dossier: f.dataset.dossier, lot: f.elements.lot.value, piece: f.elements.piece.value, texte: txt, cout: isNaN(n) ? "" : n, mode: f.elements.mode.value, quand: f.elements.quand.value});
     if(document.activeElement) document.activeElement.blur(); dirty = false; render();
   } else if(f.id === "f-dossier"){
     const titre = document.getElementById("dos-titre").value.trim(); if(!titre) return;
