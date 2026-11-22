@@ -250,25 +250,38 @@ function prochaines(){
   return actifs(S.maisons).filter(([,m]) => m.visiteLe && m.statut !== "ecartee" && new Date(m.visiteLe).getTime() >= now)
     .sort((a,b) => new Date(a[1].visiteLe) - new Date(b[1].visiteLe));
 }
+const ZONES = [["", "En cours"], ["attente", "En attente"], ["gele", "Gelé"]];
+function zoneDe(x){ return x && (x.etat === "attente" || x.etat === "gele") ? x.etat : ""; }
+function choixEtat(cible, x){
+  const z = zoneDe(x);
+  return `<label class="bar"><span class="small">Ce dossier est</span><select data-etat="${esc(cible)}" aria-label="État du dossier">${ZONES.map(([k, n]) => `<option value="${k}"${k === z ? " selected" : ""}>${n}</option>`).join("")}</select></label>`;
+}
 function vueAccueil(){
   const v = prochaines(), n = actifs(S.maisons).filter(([,m]) => m.statut !== "ecartee").length;
-  const mot = (S.meta.page || {}).mot, rm = tachesDe("maison").filter(([,x]) => !x.fait).length;
-  return `<header><h1>Marina et Mathieu</h1><p class="sub">Bonjour ${esc(moi)}</p></header>
-  <section><h2>Nos dossiers</h2>
-    <a class="card" href="#maisons">
+  const page = S.meta.page || {}, mot = page.mot, rm = tachesDe("maison").filter(([,x]) => !x.fait).length;
+  const cartes = [];
+  cartes.push({z: zoneDe(page), o: 50, titre: "Recherche de maison", href: "#maisons", h: `<a class="card" href="#maisons">
       <div class="top"><h3>Recherche de maison</h3><span class="pill s-visite-calee">${n} maison${n > 1 ? "s" : ""}</span></div>
       ${mot ? `<p>${esc(mot)}</p>` : ""}
       ${v.length ? `<p class="small">Prochaine visite : ${quand(v[0][1].visiteLe)}, ${esc(v[0][1].nom)}</p>` : `<p class="small">Pas de visite datée.</p>`}
       <p class="small">${rm} chose${rm > 1 ? "s" : ""} à faire</p>
-    </a>
-    ${(() => { const a = calcB("marina"), b = calcB("mathieu"), pb = [a, b].some(x => x.end !== null && x.end > x.seuil); return `<a class="card" href="#budget">
+    </a>`});
+  { const a = calcB("marina"), b = calcB("mathieu"), pb = [a, b].some(x => x.end !== null && x.end > x.seuil);
+    cartes.push({z: "", o: 0.5, titre: "Budget de chacun", href: "#budget", h: `<a class="card" href="#budget">
       <div class="top"><h3>Budget de chacun</h3><span class="pill ${pb ? "pb" : "ok"}">${pb ? "à ajuster" : "ça passe"}</span></div>
       <p class="small">Notre vie après l'achat : revenus, crédit de la maison, charges, et ce qui reste.</p>
-      <p class="small">Reste chaque mois : Marina ${eur(a.reste)} · Mathieu ${eur(b.reste)}</p></a>`; })()}
-    ${actifs(S.dossiers).map(([id,d]) => { const r = tachesDe(id).filter(([,x]) => !x.fait).length; return `<a class="card" href="#d-${esc(id)}">
+      <p class="small">Reste chaque mois : Marina ${eur(a.reste)} · Mathieu ${eur(b.reste)}</p></a>`}); }
+  for(const [id, d] of actifs(S.dossiers)){ const r = tachesDe(id).filter(([,x]) => !x.fait).length;
+    cartes.push({z: zoneDe(d), o: d.ordre ?? 99, titre: d.titre, href: "#d-" + id, h: `<a class="card" href="#d-${esc(id)}">
       <div class="top"><h3>${esc(d.titre)}</h3><span class="pill gris">${r} à faire</span></div>
       ${d.objectif ? `<p><strong>Objectif :</strong> ${esc(d.objectif)}</p>` : ""}
-      ${d.description ? `<p class="small">${esc(d.description)}</p>` : ""}</a>`; }).join("")}
+      ${d.description ? `<p class="small">${esc(d.description)}</p>` : ""}</a>`}); }
+  cartes.sort((a, b) => a.o - b.o);
+  const mini = (c, lab) => `<a class="card mini off" href="${esc(c.href)}"><div class="top"><strong>${esc(c.titre)}</strong><span class="pill gris">${lab}</span></div></a>`;
+  const att = cartes.filter(c => c.z === "attente"), gel = cartes.filter(c => c.z === "gele");
+  return `<header><h1>Marina et Mathieu</h1><p class="sub">Bonjour ${esc(moi)}</p></header>
+  <section><h2>En cours</h2>
+    ${cartes.filter(c => !c.z).map(c => c.h).join("")}
     <details class="card" id="det-dossier"><summary>Ajouter un dossier</summary>
       <form class="col" id="f-dossier">
         <label><span class="lab">Nom du dossier</span><input type="text" id="dos-titre" placeholder="Vacances d'été, travaux, papiers…" required></label>
@@ -277,6 +290,9 @@ function vueAccueil(){
         <button class="btn" type="submit">Créer le dossier</button>
       </form></details>
   </section>
+  ${att.length ? `<section><h2>En attente</h2>${att.map(c => mini(c, "En attente")).join("")}</section>` : ""}
+  ${gel.length ? `<section><h2>Gelé</h2>${gel.map(c => mini(c, "Gelé")).join("")}</section>` : ""}
+  ${att.length || gel.length ? `<p class="small">Pour reprendre un dossier : ouvre-le et remets-le « En cours ».</p>` : ""}
   <p class="small"><button class="back" id="sortir">Changer de personne ou de code</button></p>`;
 }
 /* ---------- budget ---------- */
@@ -469,6 +485,7 @@ function vueDossier(id){
   if(!d || d.supprime) return `<button class="back" data-go="">‹ Nos dossiers</button><p class="vide">Ce dossier n'existe plus.</p>`;
   return `<button class="back" data-go="">‹ Nos dossiers</button>
   <header><h1>${esc(d.titre)}</h1></header>
+  ${choixEtat("dossiers/" + id, d)}
   ${d.verdict ? `<p class="mot txt">${esc(d.verdict)}</p>` : ""}
   ${Array.isArray(d.faits) && d.faits.length ? `<div class="facts">${d.faits.map(f => `<div class="fact"><b>${esc(f[0])}</b><span>${esc(f[1])}</span></div>`).join("")}</div>` : ""}
   <div class="card">
@@ -516,6 +533,7 @@ function vueMaisons(){
   const n = jours("2026-12-24"), a = jours("2027-04-08");
   return `<button class="back" data-go="">‹ Nos dossiers</button>
   <header><h1>Recherche de maison</h1></header>
+  ${choixEtat("meta/page", S.meta.page)}
   <div class="facts">
     <div class="fact"><b>350 000 €</b><span>tout compris : prix, notaire, travaux</span></div>
     <div class="fact"><b>${n >= 0 ? "J-" + n : "Noël"}</b><span>avant Noël, pour signer le compromis</span></div>
@@ -685,6 +703,8 @@ app.addEventListener("change", ev => {
     if(t.dataset.f === "lien") v = safeUrl(v.trim());
     save("maisons", t.dataset.id, {[t.dataset.f]: v});
     if(t.dataset.f === "statut"){ t.blur(); dirty = false; render(); }
+  } else if(t.dataset.etat !== undefined){
+    const [col, id] = t.dataset.etat.split("/"); save(col, id, {etat: t.value}); t.blur(); dirty = false; render();
   } else if(t.dataset.tr){
     let v = t.value;
     if(t.dataset.trf === "cout"){ const n = parseInt(v.replace(/\D/g, ""), 10); v = isNaN(n) ? "" : n; }
