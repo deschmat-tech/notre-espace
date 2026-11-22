@@ -106,6 +106,16 @@ details[open] summary{margin-bottom:10px}
 ul.crit{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
 .bar select{width:auto;flex:none}
 input.cout{width:74px;flex:none;padding:6px 8px;text-align:right}
+.lg{display:flex;gap:6px;align-items:center}
+.lg input[type=text]{min-width:0}
+.lg input.lib{flex:1}
+.lg input.cout{width:88px}
+.lg input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent);flex:none}
+.scen{display:flex;flex-direction:column;gap:6px}
+.scen button{font:inherit;text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+.scen button.on{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.droit{text-align:right;white-space:nowrap}
+.top > span:first-child{min-width:0}
 </style>
 </head>
 <body>
@@ -248,10 +258,10 @@ function vueAccueil(){
       ${v.length ? `<p class="small">Prochaine visite : ${quand(v[0][1].visiteLe)}, ${esc(v[0][1].nom)}</p>` : `<p class="small">Pas de visite datée.</p>`}
       <p class="small">${rm} chose${rm > 1 ? "s" : ""} à faire</p>
     </a>
-    ${(() => { const c = calcBudget(); return `<a class="card" href="#budget">
-      <div class="top"><h3>Budget de la maison</h3><span class="pill ${c.total <= 350000 ? "ok" : c.total <= 390000 ? "moyen" : "pb"}">${eur(c.total)}</span></div>
-      <p class="small">Frais de notaire, mensualité de chacun, part de chacun.</p>
-      <p class="small">Mensualité à deux pour ce scénario : ${eur(c.mens2)}</p></a>`; })()}
+    ${(() => { const a = calcB("marina"), b = calcB("mathieu"), pb = [a, b].some(x => x.end !== null && x.end > x.seuil); return `<a class="card" href="#budget">
+      <div class="top"><h3>Budget de chacun</h3><span class="pill ${pb ? "pb" : "ok"}">${eur(a.prix + b.prix)}</span></div>
+      <p class="small">Maison en deux à Aytré : le lot, le crédit, les revenus et les charges de chacun.</p>
+      <p class="small">Marina ${eur(a.mens)} par mois · Mathieu ${eur(b.mens)} par mois</p></a>`; })()}
     ${actifs(S.dossiers).map(([id,d]) => { const r = tachesDe(id).filter(([,x]) => !x.fait).length; return `<a class="card" href="#d-${esc(id)}">
       <div class="top"><h3>${esc(d.titre)}</h3><span class="pill gris">${r} à faire</span></div>
       ${d.objectif ? `<p><strong>Objectif :</strong> ${esc(d.objectif)}</p>` : ""}
@@ -283,83 +293,119 @@ function mensualite(capital, taux, annees, ass){
   const m = r > 0 ? capital * r / (1 - Math.pow(1 + r, -n)) : capital / n;
   return m + capital * ass / 1200;
 }
-function calcBudget(){
-  const p = S.budget.params || {}, ma = S.budget.marina || {}, mt = S.budget.mathieu || {};
-  const prix = num(p.prix), travaux = num(p.travaux), nt = notaire(prix, num(p.dmto) || 6.32);
-  const total = prix + nt.total + travaux, partMt = Math.min(100, Math.max(0, num(p.part) || 50)) / 100;
-  const taux = num(p.taux), duree = num(p.duree) || 25, ass = num(p.assurance);
-  const qui = (d, part) => {
-    const cout = total * part, pret = Math.max(0, cout - num(d.apport)), mens = mensualite(pret, taux, duree, ass);
-    const rev = num(d.revenu), end = rev > 0 ? (num(d.credits) + mens) / rev * 100 : null;
-    return {cout, pret, mens, rev, cred: num(d.credits), end};
-  };
-  const a = qui(ma, 1 - partMt), b = qui(mt, partMt);
-  const rev2 = a.rev + b.rev, end2 = a.rev > 0 && b.rev > 0 ? (a.cred + b.cred + a.mens + b.mens) / rev2 * 100 : null;
-  return {prix, travaux, nt, total, partMt, marina: a, mathieu: b, pret2: a.pret + b.pret, mens2: a.mens + b.mens, end2, remploi: prix * partMt};
+/* Budget: one budget per person (each buys their own lot). Docs budget/aytre-marina, aytre-mathieu, aytre-commun. */
+const QUI = [["marina","Marina"],["mathieu","Mathieu"]];
+const LISTES = [["revenus","Ses revenus par mois","Salaire, pension, loyer…"],["credits","Ses crédits en cours par mois","Crédit auto, crédit conso…"],["charges","Ses autres charges par mois","Loyer, enfants, trajets…"]];
+function bDoc(q){ return S.budget["aytre-" + q] || {}; }
+function bLst(q, k){ const a = bDoc(q)[k]; return Array.isArray(a) ? a : []; }
+function somme(a, f){ return a.reduce((s, x) => s + (f && !f(x) ? 0 : num(x.m)), 0); }
+function prixMax(capital, apport, autres, dmto){
+  let lo = 0, hi = 3e6;
+  for(let i = 0; i < 45; i++){ const mid = (lo + hi) / 2; if(mid + notaire(mid, dmto).total + autres - apport <= capital) lo = mid; else hi = mid; }
+  return lo;
 }
-function pillEnd(e){ return e === null ? `<span class="pill gris">revenu à saisir</span>` : `<span class="pill ${e <= 35 ? "ok" : e <= 38 ? "moyen" : "pb"}">${e.toFixed(1).replace(".", ",")} % de ses revenus</span>`; }
+function calcB(q){
+  const d = bDoc(q), c = S.budget["aytre-commun"] || {};
+  const taux = num(c.taux), duree = num(c.duree) || 25, ass = num(c.assurance), dmto = num(c.dmto) || 6.32, seuil = num(c.seuil) || 35;
+  const prix = num(d.prix), nt = notaire(prix, dmto), travaux = num(d.travaux), division = num(d.division), apport = num(d.apport);
+  const total = prix + nt.total + travaux + division, pret = Math.max(0, total - apport), mens = mensualite(pret, taux, duree, ass);
+  const rev = somme(bLst(q, "revenus")), cred = somme(bLst(q, "credits"), x => x.on !== false), credTous = somme(bLst(q, "credits")), charges = somme(bLst(q, "charges"));
+  const end = rev > 0 ? (cred + mens) / rev * 100 : null, endTous = rev > 0 ? (credTous + mens) / rev * 100 : null;
+  const mensMax = Math.max(0, rev * seuil / 100 - cred), unit = mensualite(1, taux, duree, ass), capMax = unit > 0 ? mensMax / unit : 0;
+  const pmax = rev > 0 ? prixMax(capMax, apport, travaux + division, dmto) : null;
+  return {prix, nt, travaux, division, apport, total, pret, mens, rev, cred, credTous, charges, end, endTous, mensMax, pmax, reste: rev - cred - mens - charges, seuil};
+}
+function pct(e){ return e.toFixed(1).replace(".", ","); }
+function pillEnd(e, seuil){ return e === null ? `<span class="pill gris">revenus à saisir</span>` : `<span class="pill ${e <= seuil ? "ok" : e <= seuil + 3 ? "moyen" : "pb"}">${pct(e)} % de ses revenus</span>`; }
+function ligne(a, b, fort){ return `<div class="top"><span>${fort ? `<strong>${a}</strong>` : a}</span>${fort ? `<span class="prix">${b}</span>` : `<strong class="droit">${b}</strong>`}</div>`; }
 function resBudget(){
-  const c = calcBudget();
-  const etat = c.total <= 350000 ? ["ok", "Dans le budget de 350 000 €"] : c.total <= 390000 ? ["moyen", "Au-dessus de 350 000 €, sous le plafond de 390 000 €"] : ["pb", "Au-dessus du plafond de 390 000 €"];
   const set = (id, h) => { const e = document.getElementById(id); if(e) e.innerHTML = h; };
-  set("b-total", `<div class="top"><span>Prix de la maison</span><strong>${eur(c.prix)}</strong></div>
-    <div class="top"><span>Frais de notaire</span><strong>${eur(c.nt.total)}</strong></div>
-    <p class="small">dont ${eur(c.nt.droits)} de taxes, ${eur(c.nt.emol)} pour le notaire, ${eur(c.nt.divers)} de formalités</p>
-    <div class="top"><span>Travaux et agrandissement</span><strong>${eur(c.travaux)}</strong></div>
-    <div class="top" style="border-top:1px solid var(--line);padding-top:8px"><span><strong>Coût total</strong></span><span class="prix">${eur(c.total)}</span></div>
-    <div><span class="pill ${etat[0]}">${etat[1]}</span></div>`);
-  const bloc = (x) => `<div class="top"><span>Sa part du projet</span><strong>${eur(x.cout)}</strong></div>
-    <div class="top"><span>À emprunter</span><strong>${eur(x.pret)}</strong></div>
-    <div class="top"><span><strong>Sa mensualité</strong></span><span class="prix">${eur(x.mens)}</span></div>
-    <div class="top"><span class="small">Crédits en cours + cette mensualité</span>${pillEnd(x.end)}</div>`;
-  set("b-marina", bloc(c.marina)); set("b-mathieu", bloc(c.mathieu));
-  set("b-deux", `<div class="top"><span>Emprunt à deux</span><strong>${eur(c.pret2)}</strong></div>
-    <div class="top"><span><strong>Mensualité à deux</strong></span><span class="prix">${eur(c.mens2)}</span></div>
-    <div class="top"><span class="small">Endettement du couple (ce que regarde la banque)</span>${pillEnd(c.end2)}</div>
-    <div class="top"><span class="small">Part de Mathieu dans le prix d'achat (doit atteindre 109 000 €)</span><span class="pill ${c.remploi >= 109000 ? "ok" : "pb"}">${eur(c.remploi)}</span></div>`);
+  const r = {};
+  for(const [q, nom] of QUI){
+    const x = r[q] = calcB(q), marge = x.pmax === null ? null : x.pmax - x.prix;
+    set("b-" + q, `${ligne("Prix du lot", eur(x.prix))}
+      ${ligne("Frais de notaire", eur(x.nt.total))}
+      ${ligne("Travaux", eur(x.travaux))}
+      ${ligne("Frais de division (géomètre, compteurs)", eur(x.division))}
+      <div style="border-top:1px solid var(--line);padding-top:8px">${ligne("Coût total", eur(x.total), true)}</div>
+      ${ligne("Apport", "− " + eur(x.apport))}
+      ${ligne("À emprunter", eur(x.pret))}
+      ${ligne("Mensualité, assurance comprise", eur(x.mens), true)}
+      <div class="top"><span class="small">Crédits comptés + cette mensualité</span>${pillEnd(x.end, x.seuil)}</div>
+      ${x.endTous !== null && Math.abs(x.endTous - x.end) > 0.05 ? `<div class="top"><span class="small">Si tous les crédits de la liste restent comptés</span>${pillEnd(x.endTous, x.seuil)}</div>` : ""}
+      ${x.pmax === null ? "" : `<div style="border-top:1px solid var(--line);padding-top:8px">${ligne("Mensualité maximale (" + x.seuil + " % des revenus)", eur(x.mensMax))}</div>
+      ${ligne("Prix maximum du lot pour " + nom, eur(x.pmax))}
+      <div class="top"><span class="small">Marge par rapport au prix saisi</span><span class="pill ${marge >= 0 ? "ok" : "pb"}">${marge >= 0 ? "+ " : "− "}${eur(Math.abs(marge))}</span></div>
+      ${ligne("Reste pour vivre chaque mois", eur(x.reste))}
+      <p class="small">Revenus, moins les crédits comptés, la mensualité et les autres charges.</p>`}
+      ${q === "mathieu" ? `<div class="top"><span class="small">Prix du lot de Mathieu (doit atteindre 109 000 €)</span><span class="pill ${x.prix >= 109000 ? "ok" : "pb"}">${eur(x.prix)}</span></div>` : ""}`);
+  }
+  const a = r.marina, b = r.mathieu, aff = num((S.budget["aytre-commun"] || {}).affiche), tp = a.prix + b.prix;
+  set("b-deux", `${ligne("Prix des deux lots", eur(tp))}
+    ${aff > 0 && tp > 0 && Math.abs(aff - tp) >= 1 ? `<div class="top"><span class="small">Par rapport au prix affiché (${eur(aff)})</span><span class="pill ${tp <= aff ? "ok" : "pb"}">${tp <= aff ? "− " : "+ "}${eur(Math.abs(aff - tp))}, soit ${pct(Math.abs(aff - tp) / aff * 100)} %</span></div>` : ""}
+    ${ligne("Coût total des deux lots", eur(a.total + b.total))}
+    ${ligne("Emprunts des deux", eur(a.pret + b.pret))}
+    ${ligne("Mensualités des deux", eur(a.mens + b.mens), true)}`);
 }
-function champB(doc, k, lab, suf){
-  const v = (S.budget[doc] || {})[k];
-  return `<label><span class="lab">${lab}</span><input type="text" inputmode="decimal" data-bud="${doc}" data-k="${k}" value="${esc(v === undefined || v === null ? "" : String(v).replace(".", ","))}" placeholder="${suf}"></label>`;
+function champB(q, k, lab, suf){
+  const v = (S.budget["aytre-" + q] || {})[k];
+  return `<label><span class="lab">${lab}</span><input type="text" inputmode="decimal" data-bq="${q}" data-k="${k}" value="${esc(v === undefined || v === null ? "" : String(v).replace(".", ","))}" placeholder="${suf}"></label>`;
+}
+function blocListe(q, k, lab, ph){
+  const a = bLst(q, k);
+  return `<div class="col" style="gap:6px"><span class="lab" style="margin:0">${lab}</span>
+    ${a.map((x, i) => `<div class="lg"><input type="text" class="lib" data-bl="${q}/${k}/${i}/l" value="${esc(x.l || "")}" placeholder="${esc(ph)}" aria-label="Libellé"><input type="text" class="cout" inputmode="decimal" data-bl="${q}/${k}/${i}/m" value="${esc(x.m === undefined || x.m === null ? "" : String(x.m).replace(".", ","))}" placeholder="€" aria-label="Montant par mois">${k === "credits" ? `<input type="checkbox" data-bon="${q}/${i}" ${x.on !== false ? "checked" : ""} aria-label="Compté par la banque">` : ""}<button type="button" class="x" data-bdel="${q}/${k}/${i}" aria-label="Supprimer cette ligne">✕</button></div>`).join("") || `<p class="vide">Rien de saisi.</p>`}
+    ${k === "credits" && a.length ? `<p class="small">Case cochée : la banque compte ce crédit.</p>` : ""}
+    <button type="button" class="btn ghost" data-badd="${q}/${k}">Ajouter une ligne</button></div>`;
 }
 function vueBudget(){
-  const ms = actifs(S.maisons).filter(([,m]) => m.statut !== "ecartee" && typeof m.prix === "number");
-  const p = S.budget.params || {};
+  const c = S.budget["aytre-commun"] || {}, sc = Array.isArray(c.scenarios) ? c.scenarios : [];
+  const pm = num(bDoc("marina").prix), pt = num(bDoc("mathieu").prix);
   return `<button class="back" data-go="">‹ Nos dossiers</button>
-  <header><h1>Budget de la maison</h1><p class="sub">Change un chiffre, tout se recalcule.</p></header>
-  <section><h2>La maison</h2><div class="card">
-    <label><span class="lab">Partir d'une maison de la liste</span><select id="b-maison"><option value="">Choisir…</option>${ms.map(([id,m]) => `<option value="${m.prix}"${m.prix === num(p.prix) ? " selected" : ""}>${esc(m.nom)} : ${euros(m.prix)}</option>`).join("")}</select></label>
-    <div class="duo">${champB("params", "prix", "Prix de la maison", "€")}${champB("params", "travaux", "Travaux et agrandissement", "€")}</div>
-    <div class="col" id="b-total" style="gap:6px"></div>
-  </div></section>
+  <header><h1>Budget de chacun</h1><p class="sub">Maison en deux à Aytré. Chacun son lot, son prêt, son budget. Change un chiffre, tout se recalcule.</p></header>
+  ${sc.length ? `<section><h2>Le prix : nos scénarios</h2><div class="card"><div class="scen">${sc.map((x, i) => `<button type="button" data-scen="${i}" class="${num(x.marina) === pm && num(x.mathieu) === pt ? "on" : ""}"><span>${esc(x.n)}</span><span>${eur(num(x.marina) + num(x.mathieu))}</span></button>`).join("")}</div>
+    <p class="small">Touche un scénario : le prix des deux lots change, le reste suit.</p></div></section>` : ""}
+  ${QUI.map(([q, nom]) => `<section><h2>${nom}</h2><div class="card">
+    ${bDoc(q).lot ? `<p><strong>${esc(bDoc(q).lot)}</strong></p>` : ""}
+    ${bDoc(q).note ? `<p class="small txt">${esc(bDoc(q).note)}</p>` : ""}
+    <div class="duo">${champB(q, "prix", "Prix du lot", "€")}${champB(q, "travaux", "Travaux", "€")}</div>
+    <div class="duo">${champB(q, "division", "Frais de division", "€")}${champB(q, "apport", "Apport", "€")}</div>
+    ${LISTES.map(([k, lab, ph]) => blocListe(q, k, lab, ph)).join("")}
+    <div class="col" id="b-${q}" style="gap:6px;border-top:1px solid var(--line);padding-top:12px"></div>
+  </div></section>`).join("")}
+  <section><h2>Les deux lots ensemble</h2><div class="card"><div class="col" id="b-deux" style="gap:6px"></div></div></section>
   <section><h2>Le crédit</h2><div class="card">
-    <div class="duo">${champB("params", "taux", "Taux du crédit (%)", "%")}${champB("params", "duree", "Durée (années)", "ans")}</div>
-    <div class="duo">${champB("params", "assurance", "Assurance (% par an)", "%")}${champB("params", "part", "Part de Mathieu (%)", "%")}</div>
-    <p class="small">La part de Marina est le reste. Taux moyen sur 25 ans en novembre 2026 : environ 3,85 %.</p>
-    <details id="det-dmto"><summary>Réglage des frais de notaire</summary>${champB("params", "dmto", "Taxes de vente en Charente-Maritime (%)", "%")}<p class="small">6,32 % en 2026. Le calcul ajoute le barème du notaire, la TVA et 1 200 € de formalités.</p></details>
-  </div></section>
-  <section><h2>Marina</h2><div class="card">
-    ${champB("marina", "revenu", "Revenu net par mois", "€")}
-    <div class="duo">${champB("marina", "credits", "Crédits en cours par mois", "€")}${champB("marina", "apport", "Apport", "€")}</div>
-    <div class="col" id="b-marina" style="gap:6px"></div>
-  </div></section>
-  <section><h2>Mathieu</h2><div class="card">
-    ${champB("mathieu", "revenu", "Revenu net par mois", "€")}
-    <div class="duo">${champB("mathieu", "credits", "Crédits en cours par mois", "€")}${champB("mathieu", "apport", "Apport", "€")}</div>
-    <div class="col" id="b-mathieu" style="gap:6px"></div>
-  </div></section>
-  <section><h2>À deux</h2><div class="card"><div class="col" id="b-deux" style="gap:6px"></div>
-    <p class="small">Estimation pour se repérer. Le courtier donnera les vrais chiffres : une banque accepte en général jusqu'à 35 % des revenus, assurance comprise.</p></div></section>`;
+    <div class="duo">${champB("commun", "taux", "Taux du crédit (%)", "%")}${champB("commun", "duree", "Durée (années)", "ans")}</div>
+    <div class="duo">${champB("commun", "assurance", "Assurance (% par an)", "%")}${champB("commun", "seuil", "Limite de la banque (%)", "%")}</div>
+    <p class="small">Mêmes réglages pour les deux. Taux moyen sur 25 ans en novembre 2026 : environ 3,85 %. Une banque accepte en général 35 % des revenus, assurance comprise.</p>
+    <details id="det-dmto"><summary>Réglage des frais de notaire</summary>${champB("commun", "dmto", "Taxes de vente en Charente-Maritime (%)", "%")}<p class="small">6,32 % en 2026. Le calcul ajoute le barème du notaire, la TVA et 1 200 € de formalités.</p></details>
+    <p class="small">Estimation pour se repérer. Le courtier de chacun donnera les vrais chiffres.</p>
+  </div></section>`;
+}
+function blocSections(d){
+  const ss = Array.isArray(d.sections) ? d.sections : [];
+  return ss.map((s, i) => `<details class="card" id="sec-${i}"><summary>${esc(s.t)}${s.pill ? ` <span class="pill ${esc(s.ton || "gris")}">${esc(s.pill)}</span>` : ""}</summary><div class="col">
+    ${s.p ? `<p class="txt">${esc(s.p)}</p>` : ""}
+    ${Array.isArray(s.l) && s.l.length ? `<div class="col" style="gap:6px">${s.l.map(x => `<div class="top"><span>${esc(x[0])}</span>${x[2] ? `<span class="pill ${esc(x[2])}" style="white-space:normal;text-align:right">${esc(x[1])}</span>` : `<strong class="droit">${esc(x[1])}</strong>`}</div>`).join("")}</div>` : ""}
+    ${Array.isArray(s.pts) && s.pts.length ? `<ul class="crit">${s.pts.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${s.note ? `<p class="small txt">${esc(s.note)}</p>` : ""}
+  </div></details>`).join("");
 }
 function vueDossier(id){
   const d = S.dossiers[id];
   if(!d || d.supprime) return `<button class="back" data-go="">‹ Nos dossiers</button><p class="vide">Ce dossier n'existe plus.</p>`;
   return `<button class="back" data-go="">‹ Nos dossiers</button>
   <header><h1>${esc(d.titre)}</h1></header>
+  ${d.verdict ? `<p class="mot txt">${esc(d.verdict)}</p>` : ""}
+  ${Array.isArray(d.faits) && d.faits.length ? `<div class="facts">${d.faits.map(f => `<div class="fact"><b>${esc(f[0])}</b><span>${esc(f[1])}</span></div>`).join("")}</div>` : ""}
   <div class="card">
     <div><span class="lab">Objectif final</span>${d.objectif ? `<p class="txt">${esc(d.objectif)}</p>` : `<p class="vide">Pas encore écrit.</p>`}</div>
     <div><span class="lab">De quoi il s'agit</span>${d.description ? `<p class="txt">${esc(d.description)}</p>` : `<p class="vide">Pas encore écrit.</p>`}</div>
   </div>
+  ${d.fiche && S.maisons[d.fiche] && !S.maisons[d.fiche].supprime ? `<a class="card mini" href="#m-${esc(d.fiche)}"><strong>Fiche de visite de la maison ›</strong><span class="small">Nos notes point par point, nos coups de cœur.</span></a>` : ""}
+  ${d.budget ? `<a class="card mini" href="#budget"><strong>Budget de chacun ›</strong><span class="small">Le lot, le crédit, les revenus et les charges de chacun.</span></a>` : ""}
+  ${Array.isArray(d.liens) ? d.liens.filter(x => safeUrl(x[1])).map(x => `<a class="card mini" href="${esc(x[1])}" target="_blank" rel="noopener"><strong>${esc(x[0])} ›</strong></a>`).join("") : ""}
+  ${Array.isArray(d.sections) && d.sections.length ? `<section><h2>L'étude</h2>${d.maj ? `<p class="small">Mise à jour le ${esc(d.maj)}. Touche un titre pour l'ouvrir.</p>` : ""}${blocSections(d)}</section>` : ""}
   <section><h2>À faire</h2>${blocTaches(id)}</section>
   <details class="card" id="det-moddos"><summary>Modifier le dossier</summary><div class="col">
     <label><span class="lab">Nom</span><input type="text" data-dos="${esc(id)}" data-dosf="titre" value="${esc(d.titre)}"></label>
@@ -506,6 +552,24 @@ app.addEventListener("click", ev => {
   if(t.dataset.moi){ moi = t.dataset.moi; store("mm_moi", moi); const c = document.getElementById("in-code").value; render(); document.getElementById("in-code").value = c; return; }
   if(t.dataset.go !== undefined){ location.hash = t.dataset.go; return; }
   if(t.id === "sortir"){ code = ""; moi = ""; loaded = false; store("mm_code", null); store("mm_moi", null); render(); dire(""); return; }
+  if(t.dataset.scen){
+    const x = ((S.budget["aytre-commun"] || {}).scenarios || [])[Number(t.dataset.scen)]; if(!x) return;
+    save("budget", "aytre-marina", {prix: num(x.marina)}); save("budget", "aytre-mathieu", {prix: num(x.mathieu)}); dirty = false; render(); return;
+  }
+  if(t.dataset.badd){
+    const [q, k] = t.dataset.badd.split("/"), a = bLst(q, k).slice();
+    a.push(k === "credits" ? {l: "", m: "", on: true} : {l: "", m: ""});
+    save("budget", "aytre-" + q, {[k]: a}); dirty = false; render(); return;
+  }
+  if(t.dataset.bdel){
+    if(!t.dataset.armed){
+      t.dataset.armed = "1"; t.textContent = "Supprimer ?"; t.classList.add("arm");
+      setTimeout(() => { if(t.isConnected && t.dataset.armed){ delete t.dataset.armed; t.textContent = "✕"; t.classList.remove("arm"); } }, 4000);
+      return;
+    }
+    const [q, k, i] = t.dataset.bdel.split("/"), a = bLst(q, k).slice(); a.splice(Number(i), 1);
+    save("budget", "aytre-" + q, {[k]: a}); dirty = false; render(); return;
+  }
   if(t.dataset.del){
     if(!t.dataset.armed){
       const lab = t.textContent; t.dataset.armed = "1"; t.textContent = "Supprimer ?"; t.classList.add("arm");
@@ -545,10 +609,17 @@ app.addEventListener("change", ev => {
     if(t.dataset.f === "lien") v = safeUrl(v.trim());
     save("maisons", t.dataset.id, {[t.dataset.f]: v});
     if(t.dataset.f === "statut"){ t.blur(); dirty = false; render(); }
-  } else if(t.dataset.bud){
-    save("budget", t.dataset.bud, {[t.dataset.k]: t.value.trim() === "" ? "" : num(t.value)});
-  } else if(t.id === "b-maison"){
-    if(t.value){ save("budget", "params", {prix: Number(t.value)}); t.blur(); dirty = false; render(); }
+  } else if(t.dataset.bq){
+    save("budget", "aytre-" + t.dataset.bq, {[t.dataset.k]: t.value.trim() === "" ? "" : num(t.value)});
+  } else if(t.dataset.bl){
+    const [q, k, i, f] = t.dataset.bl.split("/"), a = bLst(q, k).map(x => Object.assign({}, x));
+    if(!a[i]) return;
+    a[i][f] = f === "m" ? (t.value.trim() === "" ? "" : num(t.value)) : t.value.trim();
+    save("budget", "aytre-" + q, {[k]: a});
+  } else if(t.dataset.bon){
+    const [q, i] = t.dataset.bon.split("/"), a = bLst(q, "credits").map(x => Object.assign({}, x));
+    if(!a[i]) return;
+    a[i].on = t.checked; save("budget", "aytre-" + q, {credits: a}); resBudget();
   } else if(t.dataset.dosf){
     save("dossiers", t.dataset.dos, {[t.dataset.dosf]: t.value.trim()});
   } else if(t.dataset.crit){
@@ -564,9 +635,15 @@ app.addEventListener("change", ev => {
   }
 });
 app.addEventListener("input", ev => {
-  const t = ev.target; if(!t.dataset.bud) return;
-  S.budget[t.dataset.bud] = Object.assign({}, S.budget[t.dataset.bud], {[t.dataset.k]: num(t.value)});
-  resBudget();
+  const t = ev.target;
+  if(t.dataset.bq){
+    const id = "aytre-" + t.dataset.bq;
+    S.budget[id] = Object.assign({}, S.budget[id], {[t.dataset.k]: num(t.value)}); resBudget();
+  } else if(t.dataset.bl){
+    const [q, k, i, f] = t.dataset.bl.split("/"); if(f !== "m") return;
+    const a = bLst(q, k).map(x => Object.assign({}, x)); if(!a[i]) return;
+    a[i].m = num(t.value); S.budget["aytre-" + q] = Object.assign({}, S.budget["aytre-" + q], {[k]: a}); resBudget();
+  }
 });
 app.addEventListener("focusout", () => setTimeout(() => { if(dirty) render(); }, 500));
 app.addEventListener("submit", ev => {
